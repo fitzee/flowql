@@ -1,0 +1,5 @@
+# Process events in batches of 10
+source file("events.jsonl")
+| parse_json
+| batch 10
+| sink stdout

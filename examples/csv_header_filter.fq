@@ -1,0 +1,6 @@
+# Filter CSV orders by total amount using header names
+source file("orders.csv")
+| parse_csv header
+| filter total > 100
+| project { customer_id, total, region }
+| sink stdout

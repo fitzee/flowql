@@ -1,0 +1,5 @@
+# Select only specific fields from JSON records
+source file("users.jsonl")
+| parse_json
+| project { name, email }
+| sink stdout

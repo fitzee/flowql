@@ -1,0 +1,6 @@
+# Filter CSV data for high-value orders
+source file("orders.csv")
+| parse_csv
+| filter amount > 100
+| project { customer, amount, product }
+| sink stdout

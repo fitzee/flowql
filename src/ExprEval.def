@@ -1,0 +1,18 @@
+DEFINITION MODULE ExprEval;
+(* Expression evaluator for FlowQL.
+   Evaluates AST expressions against an Event, producing a Value. *)
+
+FROM Ast IMPORT ExprPtr;
+FROM Event IMPORT Event;
+FROM Value IMPORT Value;
+
+(* Evaluate an expression in the context of an event.
+   Returns result in val.  Sets ok to FALSE on evaluation error. *)
+PROCEDURE Eval(e: ExprPtr; VAR evt: Event; VAR val: Value; VAR ok: BOOLEAN);
+
+(* Evaluate an expression as a boolean predicate.
+   Returns FALSE on error. *)
+PROCEDURE EvalBool(e: ExprPtr; VAR evt: Event; VAR result: BOOLEAN;
+                   VAR ok: BOOLEAN);
+
+END ExprEval.

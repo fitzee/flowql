@@ -1,0 +1,6 @@
+# Find failed CI test results and count failures by suite
+source file("test_results.jsonl")
+| parse_json
+| filter result = "fail"
+| count by suite
+| sink stdout

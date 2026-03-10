@@ -1,0 +1,6 @@
+# Triage nginx 5xx errors with upstream timing info
+source file("nginx_access.jsonl")
+| parse_json
+| filter status >= 500
+| map { timestamp, method, uri, status, upstream_time, request_time }
+| sink file("nginx_5xx.jsonl")

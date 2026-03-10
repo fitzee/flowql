@@ -1,0 +1,6 @@
+# Read JSON from stdin and filter
+source stdin
+| parse_json
+| filter level = "error"
+| map { timestamp, message }
+| sink stdout

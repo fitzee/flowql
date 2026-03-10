@@ -1,0 +1,60 @@
+DEFINITION MODULE Token;
+(* Token types for the FlowQL lexer. *)
+
+CONST
+  MaxLexeme = 255;
+
+TYPE
+  Kind = (
+    (* Keywords *)
+    TkSource, TkSink, TkFilter, TkMap, TkProject,
+    TkParseJson, TkParseCsv, TkParseTsv, TkParseKv,
+    TkHeader, TkNoheader,
+    TkCount, TkBy, TkBatch, TkWindow,
+    TkStdin, TkStdout, TkFile, TkLines,
+    TkAnd, TkOr, TkNot, TkContains,
+    TkTrue, TkFalse, TkNull,
+
+    (* Operators and punctuation *)
+    TkPipe,          (* | *)
+    TkLBrace,        (* { *)
+    TkRBrace,        (* } *)
+    TkLParen,        (* ( *)
+    TkRParen,        (* ) *)
+    TkComma,         (* , *)
+    TkEq,            (* = *)
+    TkNeq,           (* != *)
+    TkGt,            (* > *)
+    TkGe,            (* >= *)
+    TkLt,            (* < *)
+    TkLe,            (* <= *)
+    TkPlus,          (* + *)
+    TkMinus,         (* - *)
+    TkStar,          (* * *)
+    TkSlash,         (* / *)
+
+    (* Literals and identifiers *)
+    TkInt,
+    TkReal,
+    TkString,
+    TkIdent,
+
+    (* Special *)
+    TkEOF,
+    TkError
+  );
+
+  Token = RECORD
+    kind:   Kind;
+    lexeme: ARRAY [0..MaxLexeme] OF CHAR;
+    line:   CARDINAL;
+    col:    CARDINAL
+  END;
+
+(* Return a human-readable name for a token kind. *)
+PROCEDURE KindName(k: Kind; VAR buf: ARRAY OF CHAR);
+
+(* Return TRUE if k is a keyword token kind. *)
+PROCEDURE IsKeyword(k: Kind): BOOLEAN;
+
+END Token.

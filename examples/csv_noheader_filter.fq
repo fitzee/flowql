@@ -1,0 +1,5 @@
+# Filter headerless CSV data using generated column names (c0, c1, c2...)
+source file("data.csv")
+| parse_csv noheader
+| filter c2 > 50
+| sink stdout

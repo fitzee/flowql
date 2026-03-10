@@ -1,0 +1,17 @@
+manifest_version=1
+name=flowql
+version=0.1.0
+edition=m2plus
+entry=src/Main.mod
+includes=src
+
+[deps]
+flownet=path:../flownet
+m2json
+m2hash
+m2fmt
+m2bytes
+m2sys
+
+[test]
+entry=tests/Main.mod

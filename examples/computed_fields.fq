@@ -1,0 +1,5 @@
+# Add computed fields to events
+source file("access.jsonl")
+| parse_json
+| map { path, status, slow = latency_ms > 1000, latency_s = latency_ms / 1000 }
+| sink stdout

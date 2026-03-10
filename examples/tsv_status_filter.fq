@@ -1,0 +1,6 @@
+# Filter TSV user records by status
+source file("users.tsv")
+| parse_tsv
+| filter status = "active"
+| project { user_id, name, status }
+| sink stdout

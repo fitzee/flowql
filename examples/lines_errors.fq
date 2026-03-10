@@ -1,0 +1,5 @@
+# Simple grep-like filtering on raw lines
+source file("app.log")
+| lines
+| filter line != ""
+| sink stdout

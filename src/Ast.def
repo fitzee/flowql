@@ -1,0 +1,126 @@
+DEFINITION MODULE Ast;
+(* Abstract syntax tree for FlowQL pipelines.
+   ExprPtr is ADDRESS because Modula-2 does not allow
+   forward pointer references in definition modules. *)
+
+FROM SYSTEM IMPORT ADDRESS;
+
+CONST
+  MaxStages    = 30;
+  MaxFields    = 32;
+  MaxChildren  = 8;
+  MaxPath      = 255;
+  MaxFieldName = 63;
+
+TYPE
+  ExprPtr = ADDRESS;
+
+  (* Expression node kinds *)
+  ExprKind = (
+    EkIntLit, EkRealLit, EkStrLit, EkBoolLit, EkNullLit,
+    EkFieldRef,
+    EkBinOp, EkUnaryOp, EkParen
+  );
+
+  (* Binary operator kinds *)
+  BinOpKind = (
+    BopEq, BopNeq, BopGt, BopGe, BopLt, BopLe,
+    BopAdd, BopSub, BopMul, BopDiv,
+    BopAnd, BopOr,
+    BopContains
+  );
+
+  (* Unary operator kinds *)
+  UnaryOpKind = (UopNot, UopNeg);
+
+  Expr = RECORD
+    kind: ExprKind;
+    intVal:  INTEGER;
+    realVal: REAL;
+    strVal:  ARRAY [0..MaxPath] OF CHAR;
+    boolVal: BOOLEAN;
+    fieldName: ARRAY [0..MaxFieldName] OF CHAR;
+    binOp:  BinOpKind;
+    left:   ExprPtr;
+    right:  ExprPtr;
+    unaryOp: UnaryOpKind;
+    operand: ExprPtr;
+    line: CARDINAL;
+    col:  CARDINAL
+  END;
+
+  (* Field definition in map/project: name or name = expr *)
+  FieldDef = RECORD
+    name:       ARRAY [0..MaxFieldName] OF CHAR;
+    hasExpr:    BOOLEAN;
+    expr:       ExprPtr;
+    line:       CARDINAL;
+    col:        CARDINAL
+  END;
+
+  (* Source kind *)
+  SourceKind = (SkFile, SkStdin, SkLines, SkNamed);
+
+  Source = RECORD
+    kind: SourceKind;
+    path: ARRAY [0..MaxPath] OF CHAR;
+    line: CARDINAL;
+    col:  CARDINAL
+  END;
+
+  (* Sink kind *)
+  SinkKind = (SkStdout, SkSinkFile);
+
+  Sink = RECORD
+    kind: SinkKind;
+    path: ARRAY [0..MaxPath] OF CHAR;
+    line: CARDINAL;
+    col:  CARDINAL
+  END;
+
+  (* Stage kind *)
+  StageKind = (
+    StFilter, StMap, StProject,
+    StParseJson, StParseCsv, StParseTsv, StParseKv,
+    StLines,
+    StCount, StCountBy,
+    StBatch, StWindow
+  );
+
+  (* Header mode for CSV/TSV *)
+  HeaderMode = (HmDefault, HmHeader, HmNoheader);
+
+  Stage = RECORD
+    kind: StageKind;
+    filterExpr: ExprPtr;
+    fields:    ARRAY [0..MaxFields-1] OF FieldDef;
+    numFields: CARDINAL;
+    groupField: ARRAY [0..MaxFieldName] OF CHAR;
+    size: CARDINAL;
+    hdrMode: HeaderMode;
+    line: CARDINAL;
+    col:  CARDINAL
+  END;
+
+  Pipeline = RECORD
+    source:    Source;
+    stages:    ARRAY [0..MaxStages-1] OF Stage;
+    numStages: CARDINAL;
+    sink:      Sink;
+    hasSource: BOOLEAN;
+    hasSink:   BOOLEAN
+  END;
+
+PROCEDURE InitPipeline(VAR p: Pipeline);
+
+(* Allocate a new expression node on the heap.  Returns ExprPtr. *)
+PROCEDURE NewExpr(): ExprPtr;
+
+(* Free an expression tree recursively. *)
+PROCEDURE FreeExpr(VAR e: ExprPtr);
+
+(* Access an ExprPtr as a POINTER TO Expr.
+   Use: ep := AsExpr(ptr); ep^.kind ... *)
+PROCEDURE AsExpr(e: ExprPtr): ADDRESS;
+
+END Ast.

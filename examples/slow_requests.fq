@@ -1,0 +1,6 @@
+# Find slow requests (latency > 1 second)
+source file("access.jsonl")
+| parse_json
+| filter latency_ms > 1000
+| map { path, status, latency_ms }
+| sink stdout

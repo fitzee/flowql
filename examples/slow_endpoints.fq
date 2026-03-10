@@ -1,0 +1,6 @@
+# Identify API endpoints with p99-level latency (>2s) and count occurrences by path
+source file("api_requests.jsonl")
+| parse_json
+| filter latency_ms > 2000
+| count by endpoint
+| sink stdout

@@ -1,0 +1,41 @@
+DEFINITION MODULE Value;
+(* Runtime value type for FlowQL.
+   Supports Int, Real, Bool, String, Null. *)
+
+CONST
+  MaxStrVal = 255;
+
+TYPE
+  ValueKind = (VkInt, VkReal, VkBool, VkStr, VkNull);
+
+  Value = RECORD
+    kind:    ValueKind;
+    intVal:  INTEGER;
+    realVal: REAL;
+    boolVal: BOOLEAN;
+    strVal:  ARRAY [0..MaxStrVal] OF CHAR
+  END;
+
+  ValuePtr = POINTER TO Value;
+
+(* Constructors *)
+PROCEDURE MakeInt(n: INTEGER; VAR v: Value);
+PROCEDURE MakeReal(r: REAL; VAR v: Value);
+PROCEDURE MakeBool(b: BOOLEAN; VAR v: Value);
+PROCEDURE MakeStr(VAR s: ARRAY OF CHAR; VAR v: Value);
+PROCEDURE MakeNull(VAR v: Value);
+
+(* Allocate a Value on the heap *)
+PROCEDURE NewValue(): ValuePtr;
+PROCEDURE FreeValue(VAR p: ValuePtr);
+
+(* Comparison: returns -1, 0, or 1 *)
+PROCEDURE Compare(VAR a, b: Value): INTEGER;
+
+(* Is the value truthy? *)
+PROCEDURE IsTruthy(VAR v: Value): BOOLEAN;
+
+(* Format a value as a string for output *)
+PROCEDURE Format(VAR v: Value; VAR buf: ARRAY OF CHAR);
+
+END Value.

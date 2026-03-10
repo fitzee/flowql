@@ -1,0 +1,48 @@
+DEFINITION MODULE Event;
+(* Runtime event type for FlowQL.
+   An event is a record/dictionary mapping field names to Values. *)
+
+FROM Value IMPORT Value;
+
+CONST
+  MaxEventFields = 32;
+  MaxFieldName   = 63;
+
+TYPE
+  Field = RECORD
+    name:  ARRAY [0..MaxFieldName] OF CHAR;
+    val:   Value
+  END;
+
+  Event = RECORD
+    fields:    ARRAY [0..MaxEventFields-1] OF Field;
+    numFields: CARDINAL
+  END;
+
+  EventPtr = POINTER TO Event;
+
+(* Initialise an event to empty. *)
+PROCEDURE InitEvent(VAR e: Event);
+
+(* Add or update a field.  Returns FALSE if full. *)
+PROCEDURE SetField(VAR e: Event; VAR name: ARRAY OF CHAR; VAR v: Value): BOOLEAN;
+
+(* Get a field value by name.  Returns FALSE if not found. *)
+PROCEDURE GetField(VAR e: Event; VAR name: ARRAY OF CHAR; VAR v: Value): BOOLEAN;
+
+(* Check if a field exists. *)
+PROCEDURE HasField(VAR e: Event; VAR name: ARRAY OF CHAR): BOOLEAN;
+
+(* Allocate an event on the heap. *)
+PROCEDURE NewEvent(): EventPtr;
+
+(* Free a heap-allocated event. *)
+PROCEDURE FreeEvent(VAR p: EventPtr);
+
+(* Copy an event. *)
+PROCEDURE CopyEvent(VAR src, dst: Event);
+
+(* Format an event as a JSON object string. *)
+PROCEDURE FormatJson(VAR e: Event; VAR buf: ARRAY OF CHAR);
+
+END Event.

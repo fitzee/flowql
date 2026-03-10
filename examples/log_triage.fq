@@ -1,0 +1,6 @@
+# Triage application logs: surface high-severity entries (level >= 3 or level = "error")
+source file("app.jsonl")
+| parse_json
+| filter level >= 3 or level = "error"
+| map { timestamp, service, level, message }
+| sink stdout

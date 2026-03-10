@@ -1,0 +1,22 @@
+DEFINITION MODULE Sema;
+(* Semantic analysis for FlowQL pipelines.
+   Validates stage ordering, field references, and structural constraints. *)
+
+FROM Ast IMPORT Pipeline;
+
+CONST
+  MaxSemaErr = 127;
+
+TYPE
+  SemaResult = RECORD
+    ok:      BOOLEAN;
+    errMsg:  ARRAY [0..MaxSemaErr] OF CHAR;
+    errLine: CARDINAL;
+    errCol:  CARDINAL
+  END;
+
+(* Validate a parsed pipeline.
+   Checks structural rules and semantic constraints. *)
+PROCEDURE Validate(VAR p: Pipeline; VAR result: SemaResult);
+
+END Sema.

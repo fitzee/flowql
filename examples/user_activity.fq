@@ -1,0 +1,6 @@
+# Filter and project user activity events for login and signup actions
+source file("activity.jsonl")
+| parse_json
+| filter action = "login" or action = "signup"
+| project { user_id, action, timestamp, ip_address }
+| sink stdout

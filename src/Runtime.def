@@ -1,0 +1,89 @@
+DEFINITION MODULE Runtime;
+(* FlowQL runtime callbacks for FlowNet nodes. *)
+
+FROM SYSTEM IMPORT ADDRESS;
+FROM Ast IMPORT ExprPtr, Stage;
+FROM Event IMPORT Event;
+
+CONST
+  MaxLineBuf = 4095;
+  MaxPath    = 255;
+
+TYPE
+  FileSourceData = RECORD
+    path:    ARRAY [0..MaxPath] OF CHAR;
+    fh:      CARDINAL;
+    isStdin: BOOLEAN;
+    done:    BOOLEAN;
+    lineBuf: ARRAY [0..MaxLineBuf] OF CHAR
+  END;
+
+  CsvParseData = RECORD
+    hasHeader:  BOOLEAN;
+    headerDone: BOOLEAN;
+    headers:    ARRAY [0..31] OF ARRAY [0..63] OF CHAR;
+    numHeaders: CARDINAL
+  END;
+
+  TsvParseData = RECORD
+    hasHeader:  BOOLEAN;
+    headerDone: BOOLEAN;
+    headers:    ARRAY [0..31] OF ARRAY [0..63] OF CHAR;
+    numHeaders: CARDINAL
+  END;
+
+  FilterData = RECORD
+    expr: ExprPtr
+  END;
+
+  MapData = RECORD
+    stage: ADDRESS
+  END;
+
+  CountData = RECORD
+    count: INTEGER
+  END;
+
+  CountByData = RECORD
+    fieldName: ARRAY [0..63] OF CHAR;
+    inited:    BOOLEAN
+  END;
+
+  SinkData = RECORD
+    path:     ARRAY [0..MaxPath] OF CHAR;
+    fh:       CARDINAL;
+    isStdout: BOOLEAN
+  END;
+
+(* Callbacks *)
+PROCEDURE SourceGen(userData: ADDRESS; VAR item: ADDRESS;
+                    VAR done: BOOLEAN);
+PROCEDURE ParseJsonTransform(userData: ADDRESS; inItem: ADDRESS;
+                             VAR outItem: ADDRESS);
+PROCEDURE ParseCsvTransform(userData: ADDRESS; inItem: ADDRESS;
+                            VAR outItem: ADDRESS);
+PROCEDURE ParseTsvTransform(userData: ADDRESS; inItem: ADDRESS;
+                            VAR outItem: ADDRESS);
+PROCEDURE ParseKvTransform(userData: ADDRESS; inItem: ADDRESS;
+                           VAR outItem: ADDRESS);
+PROCEDURE LinesTransform(userData: ADDRESS; inItem: ADDRESS;
+                         VAR outItem: ADDRESS);
+PROCEDURE FilterPred(userData: ADDRESS; item: ADDRESS): BOOLEAN;
+PROCEDURE MapTransform(userData: ADDRESS; inItem: ADDRESS;
+                       VAR outItem: ADDRESS);
+PROCEDURE CountReduce(userData: ADDRESS; acc: ADDRESS;
+                      item: ADDRESS; VAR newAcc: ADDRESS);
+PROCEDURE CountByReduce(userData: ADDRESS; acc: ADDRESS;
+                        item: ADDRESS; VAR newAcc: ADDRESS);
+PROCEDURE BatchPassthrough(userData: ADDRESS; inBuf: ADDRESS;
+                           inCount: CARDINAL; outBuf: ADDRESS;
+                           VAR outCount: CARDINAL);
+PROCEDURE SinkConsume(userData: ADDRESS; item: ADDRESS);
+
+(* Lifecycle *)
+PROCEDURE OpenFileSource(VAR data: FileSourceData): BOOLEAN;
+PROCEDURE CloseFileSource(VAR data: FileSourceData);
+PROCEDURE OpenFileSink(VAR data: SinkData): BOOLEAN;
+PROCEDURE CloseFileSink(VAR data: SinkData);
+
+END Runtime.

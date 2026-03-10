@@ -1,0 +1,6 @@
+# Filter sales transactions over $500 and write to a report file
+source file("sales.csv")
+| parse_csv
+| filter total > 500
+| project { date, customer, product, total }
+| sink file("high_value_sales.jsonl")

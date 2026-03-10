@@ -1,0 +1,18 @@
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Build artifacts
+.m2c/
+build/
+
+# AI/catalog reference docs (not part of the project)
+catalog/
+docs/ai/

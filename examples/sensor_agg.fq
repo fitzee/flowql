@@ -1,0 +1,6 @@
+# Aggregate IoT sensor readings by sensor ID
+source file("readings.jsonl")
+| parse_json
+| filter value != null
+| count by sensor_id
+| sink file("sensor_counts.jsonl")

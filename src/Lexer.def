@@ -1,0 +1,31 @@
+DEFINITION MODULE Lexer;
+(* Lexical analyser for FlowQL.
+   Scans a source buffer and produces tokens. *)
+
+FROM Token IMPORT Token;
+
+CONST
+  MaxSource = 65535;
+  MaxErrors = 32;
+  MaxErrMsg = 127;
+
+TYPE
+  State = RECORD
+    src:    ARRAY [0..MaxSource] OF CHAR;
+    srcLen: CARDINAL;
+    pos:    CARDINAL;
+    line:   CARDINAL;
+    col:    CARDINAL
+  END;
+
+(* Initialise the lexer with source text. *)
+PROCEDURE Init(VAR s: State; VAR source: ARRAY OF CHAR; len: CARDINAL);
+
+(* Read the next token.  Returns FALSE at EOF. *)
+PROCEDURE Next(VAR s: State; VAR tok: Token): BOOLEAN;
+
+(* Peek at the next token without consuming it.
+   Returns FALSE at EOF. *)
+PROCEDURE Peek(VAR s: State; VAR tok: Token): BOOLEAN;
+
+END Lexer.

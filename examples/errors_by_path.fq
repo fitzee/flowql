@@ -1,0 +1,6 @@
+# Count HTTP errors (status >= 500) grouped by request path
+source file("access.jsonl")
+| parse_json
+| filter status >= 500
+| count by path
+| sink stdout

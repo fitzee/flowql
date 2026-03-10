@@ -1,0 +1,6 @@
+# Parse key=value structured logs and filter by latency
+source file("app.log")
+| parse_kv
+| filter latency > 200
+| project { ts, level, user, latency }
+| sink stdout

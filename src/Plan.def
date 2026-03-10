@@ -1,0 +1,14 @@
+DEFINITION MODULE Plan;
+(* Logical plan representation and printer for FlowQL.
+   Converts a validated AST pipeline into a printable plan. *)
+
+FROM Ast IMPORT Pipeline;
+
+(* Print the logical plan for a pipeline to stdout. *)
+PROCEDURE PrintPlan(VAR p: Pipeline);
+
+(* Print the verbose plan with context types, channel tags,
+   callback names, and builtin/custom annotations. *)
+PROCEDURE PrintPlanVerbose(VAR p: Pipeline);
+
+END Plan.

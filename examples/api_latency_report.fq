@@ -1,0 +1,5 @@
+# Generate a latency report with computed fields for slow-request classification
+source file("api_requests.jsonl")
+| parse_json
+| map { endpoint, method, latency_ms, latency_s = latency_ms / 1000, slow = latency_ms > 500, critical = latency_ms > 3000 }
+| sink file("latency_report.jsonl")

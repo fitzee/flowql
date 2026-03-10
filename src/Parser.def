@@ -1,0 +1,24 @@
+DEFINITION MODULE Parser;
+(* Recursive-descent parser for FlowQL.
+   Produces an AST Pipeline from a token stream. *)
+
+FROM Ast IMPORT Pipeline;
+
+CONST
+  MaxParseErr = 127;
+
+TYPE
+  ParseResult = RECORD
+    ok:       BOOLEAN;
+    pipeline: Pipeline;
+    errMsg:   ARRAY [0..MaxParseErr] OF CHAR;
+    errLine:  CARDINAL;
+    errCol:   CARDINAL
+  END;
+
+(* Parse a FlowQL source string into a pipeline AST.
+   source must be null-terminated or len must be accurate. *)
+PROCEDURE Parse(VAR source: ARRAY OF CHAR; len: CARDINAL;
+                VAR result: ParseResult);
+
+END Parser.

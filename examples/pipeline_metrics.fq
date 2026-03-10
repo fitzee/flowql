@@ -1,0 +1,7 @@
+# Process CI/CD pipeline duration metrics in batches of 20
+source file("pipeline_runs.jsonl")
+| parse_json
+| filter duration_s > 0 and status != "cancelled"
+| map { pipeline_id, branch, duration_s, duration_min = duration_s / 60, passed = status = "success" }
+| batch 20
+| sink file("pipeline_batches.jsonl")

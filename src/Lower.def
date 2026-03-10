@@ -1,0 +1,20 @@
+DEFINITION MODULE Lower;
+(* Lowers a validated FlowQL AST pipeline into FlowNet Pipe calls
+   and executes the pipeline. *)
+
+FROM Ast IMPORT Pipeline;
+
+CONST
+  MaxLowerErr = 127;
+
+TYPE
+  LowerResult = RECORD
+    ok:     BOOLEAN;
+    errMsg: ARRAY [0..MaxLowerErr] OF CHAR
+  END;
+
+(* Lower and execute a pipeline.
+   This is the main entry point for running a FlowQL program. *)
+PROCEDURE Execute(VAR p: Pipeline; VAR result: LowerResult);
+
+END Lower.

@@ -1,0 +1,6 @@
+# Extract critical and high severity findings from a security scan report
+source file("scan_results.jsonl")
+| parse_json
+| filter severity = "critical" or severity = "high"
+| map { cve_id, severity, package, description }
+| sink stdout
