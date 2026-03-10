@@ -76,11 +76,17 @@ BEGIN
     SkFile, SkLines:
       Assign(p.source.path, nodes[0].fileSrc.path);
       nodes[0].fileSrc.isStdin := FALSE;
-      nodes[0].fileSrc.done := FALSE
+      nodes[0].fileSrc.done := FALSE;
+      nodes[0].fileSrc.linePtr := NIL;
+      nodes[0].fileSrc.lineCap := 0;
+      nodes[0].fileSrc.lineLen := 0
   | SkStdin:
       nodes[0].fileSrc.path[0] := CHR(0);
       nodes[0].fileSrc.isStdin := TRUE;
-      nodes[0].fileSrc.done := FALSE
+      nodes[0].fileSrc.done := FALSE;
+      nodes[0].fileSrc.linePtr := NIL;
+      nodes[0].fileSrc.lineCap := 0;
+      nodes[0].fileSrc.lineLen := 0
   END;
 
   nodes[0].srcCtx.userData := ADR(nodes[0].fileSrc);

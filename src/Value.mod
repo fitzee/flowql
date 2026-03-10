@@ -1,9 +1,14 @@
 IMPLEMENTATION MODULE Value;
 
 FROM Storage IMPORT ALLOCATE, DEALLOCATE;
-FROM SYSTEM IMPORT TSIZE;
+FROM SYSTEM IMPORT TSIZE, ADDRESS, ADR;
 FROM Strings IMPORT Assign, Length;
 FROM InOut IMPORT WriteString;
+
+TYPE
+  CharPtr = POINTER TO CHAR;
+
+(* ── Constructors ─────────────────────────────────── *)
 
 PROCEDURE MakeInt(n: INTEGER; VAR v: Value);
 BEGIN
@@ -11,7 +16,9 @@ BEGIN
   v.intVal := n;
   v.realVal := 0.0;
   v.boolVal := FALSE;
-  v.strVal[0] := CHR(0)
+  v.strVal[0] := CHR(0);
+  v.strPtr := NIL;
+  v.strLen := 0
 END MakeInt;
 
 PROCEDURE MakeReal(r: REAL; VAR v: Value);
@@ -20,7 +27,9 @@ BEGIN
   v.intVal := 0;
   v.realVal := r;
   v.boolVal := FALSE;
-  v.strVal[0] := CHR(0)
+  v.strVal[0] := CHR(0);
+  v.strPtr := NIL;
+  v.strLen := 0
 END MakeReal;
 
 PROCEDURE MakeBool(b: BOOLEAN; VAR v: Value);
@@ -29,17 +38,76 @@ BEGIN
   v.intVal := 0;
   v.realVal := 0.0;
   v.boolVal := b;
-  v.strVal[0] := CHR(0)
+  v.strVal[0] := CHR(0);
+  v.strPtr := NIL;
+  v.strLen := 0
 END MakeBool;
 
 PROCEDURE MakeStr(VAR s: ARRAY OF CHAR; VAR v: Value);
+VAR
+  len, i: CARDINAL;
+  cp: CharPtr;
 BEGIN
   v.kind := VkStr;
   v.intVal := 0;
   v.realVal := 0.0;
   v.boolVal := FALSE;
-  Assign(s, v.strVal)
+  len := Length(s);
+  v.strLen := len;
+  Assign(s, v.strVal);  (* always fill inline, truncates if > MaxStrVal *)
+  IF len > CARDINAL(MaxStrVal) THEN
+    ALLOCATE(v.strPtr, len + 1);
+    i := 0;
+    WHILE i < len DO
+      cp := CharPtr(LONGCARD(v.strPtr) + LONGCARD(i));
+      cp^ := s[i];
+      INC(i)
+    END;
+    cp := CharPtr(LONGCARD(v.strPtr) + LONGCARD(len));
+    cp^ := CHR(0)
+  ELSE
+    v.strPtr := NIL
+  END
 END MakeStr;
+
+PROCEDURE MakeStrFromPtr(ptr: ADDRESS; len: CARDINAL; VAR v: Value);
+VAR
+  i, copyLen: CARDINAL;
+  srcCp, dstCp: CharPtr;
+BEGIN
+  v.kind := VkStr;
+  v.intVal := 0;
+  v.realVal := 0.0;
+  v.boolVal := FALSE;
+  v.strLen := len;
+  (* fill inline buffer — truncate if needed *)
+  IF len < CARDINAL(MaxStrVal) THEN
+    copyLen := len
+  ELSE
+    copyLen := CARDINAL(MaxStrVal)
+  END;
+  i := 0;
+  WHILE i < copyLen DO
+    srcCp := CharPtr(LONGCARD(ptr) + LONGCARD(i));
+    v.strVal[i] := srcCp^;
+    INC(i)
+  END;
+  v.strVal[copyLen] := CHR(0);
+  IF len > CARDINAL(MaxStrVal) THEN
+    ALLOCATE(v.strPtr, len + 1);
+    i := 0;
+    WHILE i < len DO
+      srcCp := CharPtr(LONGCARD(ptr) + LONGCARD(i));
+      dstCp := CharPtr(LONGCARD(v.strPtr) + LONGCARD(i));
+      dstCp^ := srcCp^;
+      INC(i)
+    END;
+    dstCp := CharPtr(LONGCARD(v.strPtr) + LONGCARD(len));
+    dstCp^ := CHR(0)
+  ELSE
+    v.strPtr := NIL
+  END
+END MakeStrFromPtr;
 
 PROCEDURE MakeNull(VAR v: Value);
 BEGIN
@@ -47,8 +115,12 @@ BEGIN
   v.intVal := 0;
   v.realVal := 0.0;
   v.boolVal := FALSE;
-  v.strVal[0] := CHR(0)
+  v.strVal[0] := CHR(0);
+  v.strPtr := NIL;
+  v.strLen := 0
 END MakeNull;
+
+(* ── Heap management ──────────────────────────────── *)
 
 PROCEDURE NewValue(): ValuePtr;
 VAR p: ValuePtr;
@@ -61,10 +133,36 @@ END NewValue;
 PROCEDURE FreeValue(VAR p: ValuePtr);
 BEGIN
   IF p # NIL THEN
+    ClearValue(p^);
     DEALLOCATE(p, TSIZE(Value));
     p := NIL
   END
 END FreeValue;
+
+PROCEDURE ClearValue(VAR v: Value);
+BEGIN
+  IF v.strPtr # NIL THEN
+    DEALLOCATE(v.strPtr, v.strLen + 1);
+    v.strPtr := NIL;
+    v.strLen := 0
+  END
+END ClearValue;
+
+PROCEDURE StrAddr(VAR v: Value): ADDRESS;
+BEGIN
+  IF v.strPtr # NIL THEN
+    RETURN v.strPtr
+  ELSE
+    RETURN ADR(v.strVal)
+  END
+END StrAddr;
+
+PROCEDURE StrLength(VAR v: Value): CARDINAL;
+BEGIN
+  RETURN v.strLen
+END StrLength;
+
+(* ── Comparison ───────────────────────────────────── *)
 
 PROCEDURE Compare(VAR a, b: Value): INTEGER;
 VAR cmpI: INTEGER;
@@ -146,6 +244,8 @@ BEGIN
   | VkStr:  RETURN ORD(v.strVal[0]) # 0
   END
 END IsTruthy;
+
+(* ── Formatting ───────────────────────────────────── *)
 
 PROCEDURE IntToStr(n: INTEGER; VAR buf: ARRAY OF CHAR);
 VAR

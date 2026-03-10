@@ -3,7 +3,8 @@ IMPLEMENTATION MODULE Event;
 FROM Storage IMPORT ALLOCATE, DEALLOCATE;
 FROM SYSTEM IMPORT TSIZE;
 FROM Strings IMPORT Assign, Length, Concat, CompareStr;
-FROM Value IMPORT Value, ValueKind, VkInt, VkReal, VkBool, VkStr, VkNull, Format;
+FROM Value IMPORT Value, ValueKind, VkInt, VkReal, VkBool, VkStr, VkNull,
+     Format, ClearValue;
 
 PROCEDURE InitEvent(VAR e: Event);
 BEGIN
@@ -65,8 +66,14 @@ BEGIN
 END NewEvent;
 
 PROCEDURE FreeEvent(VAR p: EventPtr);
+VAR i: CARDINAL;
 BEGIN
   IF p # NIL THEN
+    i := 0;
+    WHILE i < p^.numFields DO
+      ClearValue(p^.fields[i].val);
+      INC(i)
+    END;
     DEALLOCATE(p, TSIZE(Event));
     p := NIL
   END

@@ -90,6 +90,15 @@ mx test
 - No distributed execution
 - FlowNet runtime limits apply (32 nodes, 32 channels per pipeline)
 
+## Version History
+
+### 1.0.0a
+
+- Fixed CSV parser to handle RFC 4180 quoted fields (embedded commas, escaped quotes)
+- Heap-allocated line buffer with dynamic growth — no more fixed 4K line limit
+- Heap-allocated string support in Value for large intermediary strings
+- Proper field splitting on CSVs with large embedded JSON columns
+
 ## Documentation
 
 - [Language Reference](docs/language.md)

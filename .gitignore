@@ -11,6 +11,7 @@ CLAUDE.md
 
 # Build artifacts
 .m2c/
+.mx/
 build/
 
 # AI/catalog reference docs (not part of the project)

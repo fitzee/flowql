@@ -11,41 +11,95 @@ FROM Ast IMPORT ExprPtr, Expr, Stage, StageKind, StMap, StProject,
 FROM Event IMPORT Event, EventPtr, NewEvent, FreeEvent, InitEvent,
      SetField, GetField, HasField, FormatJson, MaxEventFields;
 FROM Value IMPORT Value, ValueKind, VkInt, VkReal, VkBool, VkStr, VkNull,
-     MakeInt, MakeReal, MakeBool, MakeStr, MakeNull, Format;
+     MakeInt, MakeReal, MakeBool, MakeStr, MakeStrFromPtr, MakeNull, Format,
+     StrAddr, StrLength;
 FROM ExprEval IMPORT Eval, EvalBool;
 
 TYPE
   EP = POINTER TO Expr;
   SP = POINTER TO Stage;
+  CharPtr = POINTER TO CHAR;
+
+CONST
+  InitLineCap = 8192;
+
+(* ── Line buffer helpers ─────────────────────────── *)
+
+PROCEDURE CharAt(base: ADDRESS; i: CARDINAL): CHAR;
+VAR cp: CharPtr;
+BEGIN
+  cp := CharPtr(LONGCARD(base) + LONGCARD(i));
+  RETURN cp^
+END CharAt;
+
+PROCEDURE GrowLine(VAR data: FileSourceData);
+VAR
+  newCap: CARDINAL;
+  newPtr: ADDRESS;
+  i: CARDINAL;
+  src, dst: CharPtr;
+BEGIN
+  newCap := data.lineCap * 2;
+  ALLOCATE(newPtr, newCap);
+  i := 0;
+  WHILE i < data.lineLen DO
+    src := CharPtr(LONGCARD(data.linePtr) + LONGCARD(i));
+    dst := CharPtr(LONGCARD(newPtr) + LONGCARD(i));
+    dst^ := src^;
+    INC(i)
+  END;
+  DEALLOCATE(data.linePtr, data.lineCap);
+  data.linePtr := newPtr;
+  data.lineCap := newCap
+END GrowLine;
+
+PROCEDURE PutChar(VAR data: FileSourceData; ch: CHAR);
+VAR cp: CharPtr;
+BEGIN
+  IF data.lineLen >= data.lineCap - 1 THEN
+    GrowLine(data)
+  END;
+  cp := CharPtr(LONGCARD(data.linePtr) + LONGCARD(data.lineLen));
+  cp^ := ch;
+  INC(data.lineLen)
+END PutChar;
+
+PROCEDURE TerminateLine(VAR data: FileSourceData);
+VAR cp: CharPtr;
+BEGIN
+  IF data.lineLen >= data.lineCap THEN
+    GrowLine(data)
+  END;
+  cp := CharPtr(LONGCARD(data.linePtr) + LONGCARD(data.lineLen));
+  cp^ := CHR(0)
+END TerminateLine;
 
 (* ── Source ──────────────────────────────────────── *)
 
 PROCEDURE ReadLine(VAR data: FileSourceData; VAR got: BOOLEAN);
 VAR
   ch:     CHAR;
-  i:      CARDINAL;
   actual: CARDINAL;
   chBuf:  ARRAY [0..0] OF CHAR;
 BEGIN
   got := FALSE;
-  i := 0;
+  data.lineLen := 0;
   IF data.isStdin THEN
     LOOP
       InOut.Read(ch);
       IF NOT InOut.Done THEN
-        IF i > 0 THEN got := TRUE END;
+        IF data.lineLen > 0 THEN got := TRUE END;
         data.done := TRUE;
-        data.lineBuf[i] := CHR(0);
+        TerminateLine(data);
         RETURN
       END;
       IF ch = CHR(10) THEN
-        data.lineBuf[i] := CHR(0);
+        TerminateLine(data);
         got := TRUE;
         RETURN
       END;
-      IF (ch # CHR(13)) AND (i < MaxLineBuf) THEN
-        data.lineBuf[i] := ch;
-        INC(i)
+      IF ch # CHR(13) THEN
+        PutChar(data, ch)
       END
     END
   ELSE
@@ -53,20 +107,19 @@ BEGIN
       actual := 0;
       ReadBytes(data.fh, chBuf, 1, actual);
       IF actual = 0 THEN
-        IF i > 0 THEN got := TRUE END;
+        IF data.lineLen > 0 THEN got := TRUE END;
         data.done := TRUE;
-        data.lineBuf[i] := CHR(0);
+        TerminateLine(data);
         RETURN
       END;
       ch := chBuf[0];
       IF ch = CHR(10) THEN
-        data.lineBuf[i] := CHR(0);
+        TerminateLine(data);
         got := TRUE;
         RETURN
       END;
-      IF (ch # CHR(13)) AND (i < MaxLineBuf) THEN
-        data.lineBuf[i] := ch;
-        INC(i)
+      IF ch # CHR(13) THEN
+        PutChar(data, ch)
       END
     END
   END
@@ -91,7 +144,7 @@ BEGIN
     RETURN
   END;
   evt := NewEvent();
-  MakeStr(data^.lineBuf, val);
+  MakeStrFromPtr(data^.linePtr, data^.lineLen, val);
   IF NOT SetField(evt^, "_line", val) THEN END;
   item := ADDRESS(evt);
   done := data^.done
@@ -286,9 +339,10 @@ VAR
   inEvt:  EventPtr;
   outEvt: EventPtr;
   val:    Value;
-  line:   ARRAY [0..MaxLineBuf] OF CHAR;
   found:  BOOLEAN;
   i:      CARDINAL;
+  lPtr:   ADDRESS;
+  lLen:   CARDINAL;
 BEGIN
   data := userData;
   inEvt := inItem;
@@ -297,10 +351,11 @@ BEGIN
     outItem := inItem;
     RETURN
   END;
-  Assign(val.strVal, line);
+  lPtr := StrAddr(val);
+  lLen := StrLength(val);
 
   IF data^.hasHeader AND (NOT data^.headerDone) THEN
-    ParseCsvHeaders(data^, line);
+    ParseCsvHeaders(data^, lPtr, lLen);
     data^.headerDone := TRUE;
     outEvt := NewEvent();
     InitEvent(outEvt^);
@@ -315,33 +370,73 @@ BEGIN
   END;
 
   outEvt := NewEvent();
-  ParseCsvLine(line, data^, outEvt^);
+  ParseCsvLine(lPtr, lLen, data^, outEvt^);
   outItem := ADDRESS(outEvt)
 END ParseCsvTransform;
 
-PROCEDURE ParseCsvHeaders(VAR data: CsvParseData;
-                          VAR line: ARRAY OF CHAR);
+PROCEDURE NextCsvField(linePtr: ADDRESS; lineLen: CARDINAL;
+                       VAR pos: CARDINAL;
+                       VAR buf: ARRAY OF CHAR; VAR bLen: CARDINAL);
+(* Extract next CSV field starting at pos, handling RFC 4180 quoting.
+   Advances pos past the trailing comma or to end-of-line.
+   Uses LONGCARD pointer arithmetic per REFACTOR.md. *)
 VAR
-  i, fi: CARDINAL;
+  inQuote: BOOLEAN;
+  ch: CHAR;
 BEGIN
-  data.numHeaders := 0;
-  i := 0;
-  fi := 0;
-  WHILE (i <= HIGH(line)) AND (ORD(line[i]) # 0) DO
-    IF line[i] = ',' THEN
-      data.headers[data.numHeaders][fi] := CHR(0);
-      INC(data.numHeaders);
-      fi := 0
-    ELSE
-      IF fi < 63 THEN
-        data.headers[data.numHeaders][fi] := line[i];
-        INC(fi)
+  bLen := 0;
+  IF pos >= lineLen THEN RETURN END;
+
+  ch := CharAt(linePtr, pos);
+  IF ch = '"' THEN
+    (* quoted field — consume opening quote *)
+    INC(pos);
+    inQuote := TRUE;
+    WHILE (pos < lineLen) AND inQuote DO
+      ch := CharAt(linePtr, pos);
+      IF ch = '"' THEN
+        IF (pos + 1 < lineLen) AND (CharAt(linePtr, pos + 1) = '"') THEN
+          (* escaped double-quote inside field *)
+          IF bLen < HIGH(buf) THEN buf[bLen] := '"'; INC(bLen) END;
+          INC(pos, 2)
+        ELSE
+          (* closing quote *)
+          INC(pos);
+          inQuote := FALSE
+        END
+      ELSE
+        IF bLen < HIGH(buf) THEN buf[bLen] := ch; INC(bLen) END;
+        INC(pos)
       END
     END;
-    INC(i)
+    (* skip comma after closing quote *)
+    IF (pos < lineLen) AND (CharAt(linePtr, pos) = ',') THEN INC(pos) END
+  ELSE
+    (* unquoted field — read until comma or EOL *)
+    WHILE (pos < lineLen) AND (CharAt(linePtr, pos) # ',') DO
+      IF bLen < HIGH(buf) THEN buf[bLen] := CharAt(linePtr, pos); INC(bLen) END;
+      INC(pos)
+    END;
+    IF (pos < lineLen) AND (CharAt(linePtr, pos) = ',') THEN INC(pos) END
   END;
-  data.headers[data.numHeaders][fi] := CHR(0);
-  INC(data.numHeaders)
+  IF bLen <= HIGH(buf) THEN
+    buf[bLen] := CHR(0)
+  ELSE
+    buf[HIGH(buf)] := CHR(0)
+  END
+END NextCsvField;
+
+PROCEDURE ParseCsvHeaders(VAR data: CsvParseData;
+                          linePtr: ADDRESS; lineLen: CARDINAL);
+VAR
+  pos, fLen: CARDINAL;
+BEGIN
+  data.numHeaders := 0;
+  pos := 0;
+  WHILE (pos < lineLen) AND (data.numHeaders < 32) DO
+    NextCsvField(linePtr, lineLen, pos, data.headers[data.numHeaders], fLen);
+    INC(data.numHeaders)
+  END
 END ParseCsvHeaders;
 
 PROCEDURE IntToColName(n: CARDINAL; VAR buf: ARRAY OF CHAR);
@@ -411,45 +506,27 @@ BEGIN
   END
 END MakeSmartVal;
 
-PROCEDURE ParseCsvLine(VAR line: ARRAY OF CHAR; VAR data: CsvParseData;
-                       VAR evt: Event);
+PROCEDURE ParseCsvLine(linePtr: ADDRESS; lineLen: CARDINAL;
+                       VAR data: CsvParseData; VAR evt: Event);
 VAR
-  i, fi, col: CARDINAL;
-  field:      ARRAY [0..255] OF CHAR;
-  val:        Value;
-  colName:    ARRAY [0..63] OF CHAR;
+  pos, col, fLen: CARDINAL;
+  field:          ARRAY [0..255] OF CHAR;
+  val:            Value;
+  colName:        ARRAY [0..63] OF CHAR;
 BEGIN
   InitEvent(evt);
-  i := 0;
-  fi := 0;
+  pos := 0;
   col := 0;
-  WHILE (i <= HIGH(line)) AND (ORD(line[i]) # 0) DO
-    IF line[i] = ',' THEN
-      field[fi] := CHR(0);
-      MakeSmartVal(field, val);
-      IF (col < data.numHeaders) AND data.hasHeader THEN
-        IF NOT SetField(evt, data.headers[col], val) THEN END
-      ELSE
-        IntToColName(col, colName);
-        IF NOT SetField(evt, colName, val) THEN END
-      END;
-      fi := 0;
-      INC(col)
+  WHILE pos < lineLen DO
+    NextCsvField(linePtr, lineLen, pos, field, fLen);
+    MakeSmartVal(field, val);
+    IF (col < data.numHeaders) AND data.hasHeader THEN
+      IF NOT SetField(evt, data.headers[col], val) THEN END
     ELSE
-      IF fi < 255 THEN
-        field[fi] := line[i];
-        INC(fi)
-      END
+      IntToColName(col, colName);
+      IF NOT SetField(evt, colName, val) THEN END
     END;
-    INC(i)
-  END;
-  field[fi] := CHR(0);
-  MakeSmartVal(field, val);
-  IF (col < data.numHeaders) AND data.hasHeader THEN
-    IF NOT SetField(evt, data.headers[col], val) THEN END
-  ELSE
-    IntToColName(col, colName);
-    IF NOT SetField(evt, colName, val) THEN END
+    INC(col)
   END
 END ParseCsvLine;
 
@@ -836,6 +913,9 @@ END SinkConsume;
 
 PROCEDURE OpenFileSource(VAR data: FileSourceData): BOOLEAN;
 BEGIN
+  ALLOCATE(data.linePtr, InitLineCap);
+  data.lineCap := InitLineCap;
+  data.lineLen := 0;
   IF data.isStdin THEN
     data.fh := 0;
     data.done := FALSE;
@@ -850,6 +930,10 @@ PROCEDURE CloseFileSource(VAR data: FileSourceData);
 BEGIN
   IF (NOT data.isStdin) AND (data.fh # 0) THEN
     Close(data.fh)
+  END;
+  IF data.linePtr # NIL THEN
+    DEALLOCATE(data.linePtr, data.lineCap);
+    data.linePtr := NIL
   END
 END CloseFileSource;
 

@@ -15,7 +15,9 @@ TYPE
     fh:      CARDINAL;
     isStdin: BOOLEAN;
     done:    BOOLEAN;
-    lineBuf: ARRAY [0..MaxLineBuf] OF CHAR
+    linePtr: ADDRESS;    (* heap-allocated line buffer *)
+    lineCap: CARDINAL;   (* allocated capacity *)
+    lineLen: CARDINAL    (* current line length *)
   END;
 
   CsvParseData = RECORD

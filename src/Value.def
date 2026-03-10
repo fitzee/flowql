@@ -1,6 +1,10 @@
 DEFINITION MODULE Value;
 (* Runtime value type for FlowQL.
-   Supports Int, Real, Bool, String, Null. *)
+   Supports Int, Real, Bool, String, Null.
+   Strings <= MaxStrVal chars use the inline strVal buffer.
+   Longer strings are heap-allocated via strPtr. *)
+
+FROM SYSTEM IMPORT ADDRESS;
 
 CONST
   MaxStrVal = 255;
@@ -13,7 +17,9 @@ TYPE
     intVal:  INTEGER;
     realVal: REAL;
     boolVal: BOOLEAN;
-    strVal:  ARRAY [0..MaxStrVal] OF CHAR
+    strVal:  ARRAY [0..MaxStrVal] OF CHAR;
+    strPtr:  ADDRESS;    (* heap string for values > MaxStrVal, else NIL *)
+    strLen:  CARDINAL    (* actual string length *)
   END;
 
   ValuePtr = POINTER TO Value;
@@ -23,6 +29,7 @@ PROCEDURE MakeInt(n: INTEGER; VAR v: Value);
 PROCEDURE MakeReal(r: REAL; VAR v: Value);
 PROCEDURE MakeBool(b: BOOLEAN; VAR v: Value);
 PROCEDURE MakeStr(VAR s: ARRAY OF CHAR; VAR v: Value);
+PROCEDURE MakeStrFromPtr(ptr: ADDRESS; len: CARDINAL; VAR v: Value);
 PROCEDURE MakeNull(VAR v: Value);
 
 (* Allocate a Value on the heap *)
@@ -37,5 +44,12 @@ PROCEDURE IsTruthy(VAR v: Value): BOOLEAN;
 
 (* Format a value as a string for output *)
 PROCEDURE Format(VAR v: Value; VAR buf: ARRAY OF CHAR);
+
+(* Heap string access — returns strPtr if set, else ADR(strVal) *)
+PROCEDURE StrAddr(VAR v: Value): ADDRESS;
+PROCEDURE StrLength(VAR v: Value): CARDINAL;
+
+(* Free heap string if allocated.  Safe to call on any Value. *)
+PROCEDURE ClearValue(VAR v: Value);
 
 END Value.
