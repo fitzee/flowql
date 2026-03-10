@@ -2,7 +2,7 @@
 
 **Streaming Pipeline DSL for Modula-2+, built on FlowNet**
 
-FlowQL is a compact declarative language for describing streaming data pipelines. It compiles to [FlowNet](../flownet/) pipelines, leveraging FlowNet's bounded channels, threaded processes, and reusable nodes.
+FlowQL is a compact declarative language for describing streaming data pipelines. It compiles to [FlowNet](https://github.com/fitzee/flownet) pipelines, leveraging FlowNet's bounded channels, threaded processes, and reusable nodes.
 
 ## Example
 
